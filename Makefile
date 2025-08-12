@@ -1,5 +1,8 @@
+# Makefile
+# Author: s0g3king
+
 all:
-	gcc -o riscv-emulator main.c
+	gcc -Wall -Wextra -g -o riscv-emulator main.c
 
 clean:
 	rm -f riscv-emulator

@@ -1,3 +1,9 @@
+/*
+ * main.c
+ * Author: s0g3king
+ * Simple RISC-V (RV32I) emulator: memory, registers, fetch/decode/execute
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -13,6 +19,10 @@ uint8_t memory[MEM_SIZE]; // byte-addressable
 
 uint32_t load_word(uint32_t addr)
 {
+  if (addr + 3 >= MEM_SIZE) { // out of bounds
+    printf("[-]\t Load out of bounds: 0x%x\n", addr);
+    exit(1);
+  }
   return memory[addr] |
     (memory[addr + 1] << 8) |
     (memory[addr + 2] << 16) |
@@ -21,6 +31,10 @@ uint32_t load_word(uint32_t addr)
 
 void store_word(uint32_t addr, uint32_t val)
 {
+  if (addr + 3 >= MEM_SIZE) { // out of bounds
+    printf("[-]\t Store out of bounds: 0x%x\n", addr);
+    exit(1);
+  }
   memory[addr]   = val         & 0xff;
   memory[addr+1] = (val >> 8)  & 0xff;
   memory[addr+2] = (val >> 16) & 0xff;
@@ -142,17 +156,35 @@ void execute(void *decoded_inst)
       {
         IType *i = (IType*) decoded_inst;
         // Handle I-type instructions (e.g. ADDI)
-        if (i->funct3 == 0x0) { // ADDI
+        if (opcode == 0x03) { // loads are not implemented yet
+          puts("[-]\t Load instructions not implemented yet");
+        }
+        else if (i->funct3 == 0x0) { // ADDI
           regs[i->rd] = (int32_t)regs[i->rs1] + sign_extend(i->imm, 12);
           printf("[*]\t ADDI x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
         } 
-        else if (i->funct3 == 0x2) { // SLTI
-          regs[i->rd] = regs[i->rs1] < sign_extend(i->imm, 12) ? 1 : 0;
-          printf("[*]\t STLI x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
+        else if (i->funct3 == 0x2) { // SLTI (signed compare)
+          regs[i->rd] = (int32_t)regs[i->rs1] < sign_extend(i->imm, 12) ? 1 : 0;
+          printf("[*]\t SLTI x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
         }
-        else if (i->funct3 == 0x3) { // SLTIU
-          regs[i->rd] = regs[i->rs1] < i->imm ? 1 : 0;
-          printf("[*]\t ADDI x%d, x%d, %d\n", i->rd, i->rs1, i->imm);
+        else if (i->funct3 == 0x3) { // SLTIU (imm is sign extended, then compared as unsigned)
+          regs[i->rd] = regs[i->rs1] < (uint32_t)sign_extend(i->imm, 12) ? 1 : 0;
+          printf("[*]\t SLTIU x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
+        }
+        else if (i->funct3 == 0x4) { // XORI
+          regs[i->rd] = regs[i->rs1] ^ sign_extend(i->imm, 12);
+          printf("[*]\t XORI x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
+        }
+        else if (i->funct3 == 0x6) { // ORI
+          regs[i->rd] = regs[i->rs1] | sign_extend(i->imm, 12);
+          printf("[*]\t ORI x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
+        }
+        else if (i->funct3 == 0x7) { // ANDI
+          regs[i->rd] = regs[i->rs1] & sign_extend(i->imm, 12);
+          printf("[*]\t ANDI x%d, x%d, %d\n", i->rd, i->rs1, sign_extend(i->imm, 12));
+        }
+        else {
+          puts("[-]\t Unknown Instruction");
         }
         break;
       }
@@ -161,6 +193,8 @@ void execute(void *decoded_inst)
         SType *s = (SType*) decoded_inst;
         // Handle S-type instructions (e.g. SW)
         store_word(regs[s->rs1] + sign_extend(s->imm, 12), regs[s->rs2]);
+        printf("[*]\t SW x%d, %d(x%d)\n", s->rs2, sign_extend(s->imm, 12), s->rs1);
+        break;
       }
     case 0x17: // U-type  (Since there's only two UType instructions I'll just separate them by opcode)
       {
@@ -234,6 +268,10 @@ int main(int argc, char *argv[])
     uint32_t opcode = inst & 0x7f;
 
     void *decoded_inst = allocate_instruction(opcode);
+    if (decoded_inst == NULL) { // unknown opcode, nothing to decode
+      printf("[-]\t Unknown opcode: %x\n", opcode);
+      break;
+    }
     
     decode_instruction(inst, decoded_inst);
     execute(decoded_inst);
@@ -241,10 +279,10 @@ int main(int argc, char *argv[])
     free(decoded_inst);
   }
 
-  printf("x1 = %d\n", regs[1]);
-  printf("x2 = %d\n", regs[2]);
-  printf("x3 = %d\n", regs[3]);
-  printf("x4 = %d\n", regs[4]);
+  printf("x1 = %d\n", (int32_t)regs[1]);
+  printf("x2 = %d\n", (int32_t)regs[2]);
+  printf("x3 = %d\n", (int32_t)regs[3]);
+  printf("x4 = %d\n", (int32_t)regs[4]);
 
   return 0;
 }

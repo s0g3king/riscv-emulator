@@ -1,3 +1,9 @@
+/*
+ * instruction_types.h
+ * Author: s0g3king
+ * Structs for the RISC-V instruction formats (R, I, S, B, U, J)
+ */
+
 #ifndef INSTRUCTION_TYPES_H
 #define INSTRUCTION_TYPES_H
 
@@ -57,4 +63,3 @@ typedef struct {
 
 
 #endif // INSTRUCTION_TYPES_H
-
